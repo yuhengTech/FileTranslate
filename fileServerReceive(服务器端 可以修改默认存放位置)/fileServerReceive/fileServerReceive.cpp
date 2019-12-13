@@ -9,6 +9,7 @@
 #include <iostream>
 #include  <direct.h>
 #include "process.h"
+#include <string>
 using namespace std;
 
 #define PORT 8087
@@ -18,6 +19,9 @@ using namespace std;
 #pragma comment(lib, "WS2_32")
 unsigned int _stdcall  Server_accept_upload(void *par);
 unsigned int _stdcall  Server_accept_download(void *par);
+
+char upload_to_server_path[100] = "c:\\test\\";     //用来设置服务器默认存放文件的位置
+
 SOCKET InitNewSocket()
 {
 	//声明地址结构
@@ -80,11 +84,12 @@ unsigned int _stdcall  Server_accept_upload(void *par)
 	strncpy(file_name, buffer, strlen(buffer) > FILE_NAME_MAX_SIZE ? FILE_NAME_MAX_SIZE : strlen(buffer));  //长度取较短的
 	std::cout << "接收文件名：" << file_name << endl;
 
-	char test[FILE_NAME_MAX_SIZE + 1] = "c:\\test1\\";
-	strcat(test, file_name);
+	char file[FILE_NAME_MAX_SIZE + 1];
+	strcpy(file, upload_to_server_path);
+	strcat(file, file_name);
 
-	cout << test << endl;
-	FILE *fp = fopen(test, "wb");  //以只写，二进制的方式打开一个文件
+	cout << file << endl;
+	FILE *fp = fopen(file, "wb");  //以只写，二进制的方式打开一个文件
 	assert(NULL != fp);
 	memset(buffer, 0, BUFFER_SIZE);
 	int length = 0;
@@ -115,7 +120,7 @@ void listenToDownload()
 		if (m_new_socket!=INVALID_SOCKET)
 		{
 			cout << "客户端:" << inet_ntoa(client_addr.sin_addr) << "连接成功" << endl;
-			hThread1 = _beginthreadex(NULL, 0, Server_accept_upload, (LPVOID)m_new_socket, 0, &ThreadID1);
+			hThread1 = _beginthreadex(NULL, 0, Server_accept_download, (LPVOID)m_new_socket, 0, &ThreadID1);
 		}
 		else cout << "连接失败" << endl;
 		
@@ -155,8 +160,27 @@ unsigned int _stdcall  Server_accept_download(void *par)
 
 int main()
 {
-	//listenToDownload();
-	//因为时间限制，后续版本再补上自动选择的，目前只能执行一个函数
-	listenToUpload();
+	cout << "欢迎使用文件服务器" << endl
+		<< "请选择服务器的工作模式(输入数字)" << endl
+		<< "-->  0.客户端上传文件到本服务器" << endl
+		<< "-->  1.客户端从本服务器下载文件到本地" << endl
+		<< "-->  2.关闭程序" << endl;
+	int choose = 0;
+	cin >> choose;
+	switch (choose)
+	{
+	case 0:
+		cout << "设置服务器文件接收存放位置,例如输入'c:\\test\\'" << endl;
+		cin >> upload_to_server_path;
+		listenToUpload();
+		break;
+	case 1:
+		listenToDownload();
+		break;
+	case 2:
+		return 0;
+	default:
+		cout << "输入错误" << endl;
+	}
 	return 0;
 }
