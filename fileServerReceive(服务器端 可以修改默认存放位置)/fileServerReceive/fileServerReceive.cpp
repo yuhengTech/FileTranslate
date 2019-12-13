@@ -7,6 +7,8 @@
 #include <WinSock2.h>
 #include <cassert>
 #include <iostream>
+#include  <direct.h>
+#include "process.h"
 using namespace std;
 
 #define PORT 8087
@@ -14,7 +16,8 @@ using namespace std;
 #define BUFFER_SIZE 1024
 #define FILE_NAME_MAX_SIZE 512
 #pragma comment(lib, "WS2_32")
-
+unsigned int _stdcall  Server_accept_upload(void *par);
+unsigned int _stdcall  Server_accept_download(void *par);
 SOCKET InitNewSocket()
 {
 	//声明地址结构
@@ -42,27 +45,42 @@ SOCKET InitNewSocket()
 }
 void listenToUpload()
 {
+	unsigned hThread1;
+	unsigned ThreadID1;
+
 	//初始化端Server套接字
 	SOCKET UploadServerSocket = InitNewSocket();
-	//等待连接
-	std::cout << "等待客户端连接 ..." << std::endl;
-	sockaddr_in client_addr;
-	int client_addr_len = sizeof(client_addr);
-	SOCKET m_new_socket = accept(UploadServerSocket, (sockaddr *)&client_addr, &client_addr_len);    //创建和客户端的连接
-	assert(SOCKET_ERROR != m_new_socket);
-	std::cout << "新客户端连接成功" << std::endl;
-
+	while (1)
+	{
+		//等待连接
+		cout << "等待客户端连接 ..." << endl;
+		sockaddr_in client_addr;
+		int client_addr_len = sizeof(client_addr);
+		SOCKET m_new_socket = accept(UploadServerSocket, (sockaddr *)&client_addr, &client_addr_len);    //创建和客户端的连接
+		if (SOCKET_ERROR == m_new_socket)
+		{
+			cout << "连接失败" << endl;
+		}
+		else {
+			cout << "客户端:"<<inet_ntoa(client_addr.sin_addr)<<"连接成功" << endl;
+			hThread1 = _beginthreadex(NULL, 0, Server_accept_upload, (LPVOID)m_new_socket, 0, &ThreadID1);
+		}
+	}
+	closesocket(UploadServerSocket);
+	WSACleanup();
+}
+unsigned int _stdcall  Server_accept_upload(void *par)
+{
+	SOCKET m_new_socket = SOCKET(par);
 	char buffer[BUFFER_SIZE];
 	memset(buffer, 0, BUFFER_SIZE);
 	assert(recv(m_new_socket, buffer, BUFFER_SIZE, 0) >= 0);								//接收客户端发来的文件名
-
-
 	char file_name[FILE_NAME_MAX_SIZE + 1];
 	memset(file_name, 0, FILE_NAME_MAX_SIZE + 1);
 	strncpy(file_name, buffer, strlen(buffer) > FILE_NAME_MAX_SIZE ? FILE_NAME_MAX_SIZE : strlen(buffer));  //长度取较短的
-	std::cout <<"接收文件名：" <<file_name<<endl;
+	std::cout << "接收文件名：" << file_name << endl;
 
-	char test[FILE_NAME_MAX_SIZE + 1]="c:\\test1\\";//在这里修改默认存放目录
+	char test[FILE_NAME_MAX_SIZE + 1] = "c:\\test1\\";
 	strcat(test, file_name);
 
 	cout << test << endl;
@@ -78,20 +96,38 @@ void listenToUpload()
 	std::cout << "来自客户端的上传文件 : " << file_name << endl << " 上传成功 !" << std::endl;
 	fclose(fp);
 	closesocket(m_new_socket);
-	closesocket(UploadServerSocket);
-	WSACleanup();
+	return 0;
 }
+
 void listenToDownload()
 {
+	unsigned hThread1;
+	unsigned ThreadID1;
 	//初始化端Server套接字
 	SOCKET DownloadServerSocket = InitNewSocket();
-	//等待连接
-	std::cout << "等待客户端连接 ..." << std::endl;
-	sockaddr_in client_addr;
-	int client_addr_len = sizeof(client_addr);
-	SOCKET m_new_socket = accept(DownloadServerSocket, (sockaddr *)&client_addr, &client_addr_len);
-	assert(SOCKET_ERROR != m_new_socket);
-	std::cout << "新客户端连接成功" << std::endl;
+	while (1)
+	{
+		//等待连接
+		std::cout << "等待客户端连接 ..." << std::endl;
+		sockaddr_in client_addr;
+		int client_addr_len = sizeof(client_addr);
+		SOCKET m_new_socket = accept(DownloadServerSocket, (sockaddr *)&client_addr, &client_addr_len);
+		if (m_new_socket!=INVALID_SOCKET)
+		{
+			cout << "客户端:" << inet_ntoa(client_addr.sin_addr) << "连接成功" << endl;
+			hThread1 = _beginthreadex(NULL, 0, Server_accept_upload, (LPVOID)m_new_socket, 0, &ThreadID1);
+		}
+		else cout << "连接失败" << endl;
+		
+	}
+	
+	closesocket(DownloadServerSocket);
+	//释放 winsock 库
+	WSACleanup();
+}
+unsigned int _stdcall  Server_accept_download(void *par)
+{
+	SOCKET m_new_socket = SOCKET(par);
 	char buffer[BUFFER_SIZE];
 	memset(buffer, 0, BUFFER_SIZE);
 	assert(recv(m_new_socket, buffer, BUFFER_SIZE, 0) >= 0);
@@ -114,15 +150,13 @@ void listenToDownload()
 	fclose(fp);
 	std::cout << "文件: " << file_name << std::endl << "发送成功 !" << std::endl;
 	closesocket(m_new_socket);
-	closesocket(DownloadServerSocket);
-	//释放 winsock 库
-	WSACleanup();
+	return 0;
 }
-
 
 int main()
 {
-	//listenToDownload();因为时间限制，后续版本再补上自动选择的，目前只能执行一个函数
+	//listenToDownload();
+	//因为时间限制，后续版本再补上自动选择的，目前只能执行一个函数
 	listenToUpload();
 	return 0;
 }
